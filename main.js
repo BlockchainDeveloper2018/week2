@@ -26,7 +26,7 @@ var MessageType = {
 };
 
 var getGenesisBlock = () => {
-    return new Block(0, "0", 1465154705, "my genesis block!!", "816534932c2b7154836da6afc367695e6337db8a921823784c14378abed4f7d7");
+    return new Block(0, "0", 1465154705, "my first block", "016534932c2b7154836da6afc367695e6337db8a921823784c14378abed4f7d7");
 };
 
 var blockchain = [getGenesisBlock()];
@@ -38,10 +38,13 @@ var initHttpServer = () => {
     app.get('/blocks', (req, res) => res.send(JSON.stringify(blockchain)));
     app.post('/mineBlock', (req, res) => {
         var newBlock = generateNextBlock(req.body.data);
-        addBlock(newBlock);
-        broadcast(responseLatestMsg());
-        console.log('block added: ' + JSON.stringify(newBlock));
-        res.send();
+        if (addBlock(newBlock)) {
+            broadcast(responseLatestMsg());
+            console.log('block added: ' + JSON.stringify(newBlock));
+            res.send();
+        }else{
+            console.log('Block can\'t be added');
+        }
     });
     app.get('/peers', (req, res) => {
         res.send(sockets.map(s => s._socket.remoteAddress + ':' + s._socket.remotePort));
@@ -116,11 +119,17 @@ var calculateHash = (index, previousHash, timestamp, data) => {
 var addBlock = (newBlock) => {
     if (isValidNewBlock(newBlock, getLatestBlock())) {
         blockchain.push(newBlock);
+        return true;
+    }else{
+        return false;
     }
 };
 
 var isValidNewBlock = (newBlock, previousBlock) => {
-    if (previousBlock.index + 1 !== newBlock.index) {
+    if (newBlock.hash[0] != '0') {
+        console.log('invalid hash: ' + newBlock.hash + '\nHash should start from \'0\'');
+        return false;
+    } else if (previousBlock.index + 1 !== newBlock.index) {
         console.log('invalid index');
         return false;
     } else if (previousBlock.hash !== newBlock.previousHash) {
