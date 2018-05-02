@@ -9,12 +9,13 @@ var p2p_port = process.env.P2P_PORT || 6001;
 var initialPeers = process.env.PEERS ? process.env.PEERS.split(',') : [];
 
 class Block {
-    constructor(index, previousHash, timestamp, data, hash) {
+    constructor(index, previousHash, timestamp, data, hash, nOnce) {
         this.index = index;
         this.previousHash = previousHash.toString();
         this.timestamp = timestamp;
         this.data = data;
         this.hash = hash.toString();
+        this.nOnce = nOnce;
     }
 }
 
@@ -26,7 +27,7 @@ var MessageType = {
 };
 
 var getGenesisBlock = () => {
-    return new Block(0, "0", 1465154705, "my first block", "016534932c2b7154836da6afc367695e6337db8a921823784c14378abed4f7d7");
+    return new Block(0, "0", 1465154705, "my first block", "016534932c2b7154836da6afc367695e6337db8a921823784c14378abed4f7d7", 0);
 };
 
 var blockchain = [getGenesisBlock()];
@@ -38,13 +39,10 @@ var initHttpServer = () => {
     app.get('/blocks', (req, res) => res.send(JSON.stringify(blockchain)));
     app.post('/mineBlock', (req, res) => {
         var newBlock = generateNextBlock(req.body.data);
-        if (addBlock(newBlock)) {
-            broadcast(responseLatestMsg());
-            console.log('block added: ' + JSON.stringify(newBlock));
-            res.send();
-        }else{
-            console.log('Block can\'t be added');
-        }
+        addBlock(newBlock)
+        broadcast(responseLatestMsg());
+        console.log('block added: ' + JSON.stringify(newBlock));
+        res.send();
     });
     app.get('/peers', (req, res) => {
         res.send(sockets.map(s => s._socket.remoteAddress + ':' + s._socket.remotePort));
@@ -100,27 +98,36 @@ var initErrorHandler = (ws) => {
 
 
 var generateNextBlock = (blockData) => {
+    var nOnce = 0;
     var previousBlock = getLatestBlock();
     var nextIndex = previousBlock.index + 1;
     var nextTimestamp = new Date().getTime() / 1000;
-    var nextHash = calculateHash(nextIndex, previousBlock.hash, nextTimestamp, blockData);
-    return new Block(nextIndex, previousBlock.hash, nextTimestamp, blockData, nextHash);
+
+    do {
+        var nextHash = calculateHash(nextIndex, previousBlock.hash, nextTimestamp, blockData, nOnce);
+        console.log('Hash for (' + nextIndex + "; " + previousBlock.hash + "; " + nextTimestamp + "; " + blockData + "; " + nOnce++);
+    } while (nextHash[0] != '0');
+
+    nOnce = nOnce - 1;
+    console.log('nOnce = ' + nOnce);
+    return new Block(nextIndex, previousBlock.hash, nextTimestamp, blockData, nextHash, nOnce);
 };
 
 
 var calculateHashForBlock = (block) => {
-    return calculateHash(block.index, block.previousHash, block.timestamp, block.data);
+    return calculateHash(block.index, block.previousHash, block.timestamp, block.data, block.nOnce);
 };
 
-var calculateHash = (index, previousHash, timestamp, data) => {
-    return CryptoJS.SHA256(index + previousHash + timestamp + data).toString();
+var calculateHash = (index, previousHash, timestamp, data, nOnce) => {
+    console.log('Checking hash for (' + index + "; " + previousHash + "; " + timestamp + "; " + data + "; " + nOnce);
+    return CryptoJS.SHA256(index + previousHash + timestamp + data + nOnce).toString();
 };
 
 var addBlock = (newBlock) => {
     if (isValidNewBlock(newBlock, getLatestBlock())) {
         blockchain.push(newBlock);
         return true;
-    }else{
+    } else {
         return false;
     }
 };
@@ -203,7 +210,7 @@ var isValidChain = (blockchainToValidate) => {
 var getLatestBlock = () => blockchain[blockchain.length - 1];
 var queryChainLengthMsg = () => ({'type': MessageType.QUERY_LATEST});
 var queryAllMsg = () => ({'type': MessageType.QUERY_ALL});
-var responseChainMsg = () =>({
+var responseChainMsg = () => ({
     'type': MessageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify(blockchain)
 });
 var responseLatestMsg = () => ({
