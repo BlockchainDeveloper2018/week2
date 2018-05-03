@@ -1,3 +1,11 @@
+# Changes:
+
+* Changed blocks validation - it should start with 0.
+* Complexity (how many 0 in the beginning of each block) can be set
+* Each block should contain information about transfer of smth(from, to, amount):
+```
+curl -H "Content-type:application/json" --data '{"from" : "Julia", "to" : "Gosha", "amount" : "10"}' http://localhost:3001/mineBlock
+``` 
 # Naivechain - a blockchain implementation in 200 lines of code
 
 ### Motivation
@@ -48,7 +56,7 @@ curl http://localhost:3001/blocks
 ```
 ##### Create block
 ```
-curl -H "Content-type:application/json" --data '{"data" : "Some data to the first block"}' http://localhost:3001/mineBlock
+curl -H "Content-type:application/json" --data '{"from" : "Julia", "to" : "Gosha", "amount" : "10"}' http://localhost:3001/mineBlock
 ``` 
 ##### Add peer
 ```

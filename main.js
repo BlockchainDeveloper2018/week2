@@ -7,13 +7,16 @@ var WebSocket = require("ws");
 var http_port = process.env.HTTP_PORT || 3001;
 var p2p_port = process.env.P2P_PORT || 6001;
 var initialPeers = process.env.PEERS ? process.env.PEERS.split(',') : [];
+var complexity = "000"
 
 class Block {
-    constructor(index, previousHash, timestamp, data, hash, nonce) {
+    constructor(index, previousHash, timestamp, from, to, amount, hash, nonce) {
         this.index = index;
         this.previousHash = previousHash.toString();
         this.timestamp = timestamp;
-        this.data = data;
+        this.from = from;
+        this.to = to;
+        this.amount = amount;
         this.hash = hash.toString();
         this.nonce = nonce;
     }
@@ -27,7 +30,7 @@ var MessageType = {
 };
 
 var getGenesisBlock = () => {
-    return new Block(0, "0", 1465154705, "my first block", "016534932c2b7154836da6afc367695e6337db8a921823784c14378abed4f7d7", 0);
+    return new Block(0, "0", 1465154705, "System", "Julia", 100, "016534932c2b7154836da6afc367695e6337db8a921823784c14378abed4f7d7", 0);
 };
 
 var blockchain = [getGenesisBlock()];
@@ -38,7 +41,7 @@ var initHttpServer = () => {
 
     app.get('/blocks', (req, res) => res.send(JSON.stringify(blockchain)));
     app.post('/mineBlock', (req, res) => {
-        var newBlock = generateNextBlock(req.body.data);
+        var newBlock = generateNextBlock(req.body.from, req.body.to, req.body.amount);
         addBlock(newBlock)
         broadcast(responseLatestMsg());
         console.log('block added: ' + JSON.stringify(newBlock));
@@ -97,30 +100,30 @@ var initErrorHandler = (ws) => {
 };
 
 
-var generateNextBlock = (blockData) => {
+var generateNextBlock = (from, to, amount) => {
     var nonce = 0;
     var previousBlock = getLatestBlock();
     var nextIndex = previousBlock.index + 1;
     var nextTimestamp = new Date().getTime() / 1000;
 
     do {
-        var nextHash = calculateHash(nextIndex, previousBlock.hash, nextTimestamp, blockData, nonce);
-        console.log('Hash for (' + nextIndex + "; " + previousBlock.hash + "; " + nextTimestamp + "; " + blockData + "; " + nonce++);
-    } while (nextHash[0] != '0');
+        var nextHash = calculateHash(nextIndex, previousBlock.hash, nextTimestamp, from, to, amount, nonce);
+        console.log('Hash for (' + nextIndex + "; " + previousBlock.hash + "; " + nextTimestamp + "; " + from + " -> " + to + " [" + amount + "]; " + nonce++);
+    } while (!nextHash.startsWith(complexity));
 
     nonce = nonce - 1;
     console.log('nonce = ' + nonce);
-    return new Block(nextIndex, previousBlock.hash, nextTimestamp, blockData, nextHash, nonce);
+    return new Block(nextIndex, previousBlock.hash, nextTimestamp, from, to, amount, nextHash, nonce);
 };
 
 
 var calculateHashForBlock = (block) => {
-    return calculateHash(block.index, block.previousHash, block.timestamp, block.data, block.nonce);
+    return calculateHash(block.index, block.previousHash, block.timestamp, block.from, block.to, block.amount, block.nonce);
 };
 
-var calculateHash = (index, previousHash, timestamp, data, nonce) => {
-    console.log('Checking hash for (' + index + "; " + previousHash + "; " + timestamp + "; " + data + "; " + nonce);
-    return CryptoJS.SHA256(index + previousHash + timestamp + data + nonce).toString();
+var calculateHash = (index, previousHash, timestamp, from, to, amount, nonce) => {
+    console.log('Checking hash for (' + index + "; " + previousHash + "; " + timestamp + "; " + from + " -> " + to + " [" + amount + "]; " + nonce);
+    return CryptoJS.SHA256(index + previousHash + timestamp + from + to + amount + nonce).toString();
 };
 
 var addBlock = (newBlock) => {
@@ -133,8 +136,8 @@ var addBlock = (newBlock) => {
 };
 
 var isValidNewBlock = (newBlock, previousBlock) => {
-    if (newBlock.hash[0] != '0') {
-        console.log('invalid hash: ' + newBlock.hash + '\nHash should start from \'0\'');
+    if (!newBlock.hash.startsWith(complexity)) {
+        console.log('invalid hash: ' + newBlock.hash + '\nHash should start from ' + complexity);
         return false;
     } else if (previousBlock.index + 1 !== newBlock.index) {
         console.log('invalid index');
