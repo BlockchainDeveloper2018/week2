@@ -9,13 +9,13 @@ var p2p_port = process.env.P2P_PORT || 6001;
 var initialPeers = process.env.PEERS ? process.env.PEERS.split(',') : [];
 
 class Block {
-    constructor(index, previousHash, timestamp, data, hash, nOnce) {
+    constructor(index, previousHash, timestamp, data, hash, nonce) {
         this.index = index;
         this.previousHash = previousHash.toString();
         this.timestamp = timestamp;
         this.data = data;
         this.hash = hash.toString();
-        this.nOnce = nOnce;
+        this.nonce = nonce;
     }
 }
 
@@ -98,29 +98,29 @@ var initErrorHandler = (ws) => {
 
 
 var generateNextBlock = (blockData) => {
-    var nOnce = 0;
+    var nonce = 0;
     var previousBlock = getLatestBlock();
     var nextIndex = previousBlock.index + 1;
     var nextTimestamp = new Date().getTime() / 1000;
 
     do {
-        var nextHash = calculateHash(nextIndex, previousBlock.hash, nextTimestamp, blockData, nOnce);
-        console.log('Hash for (' + nextIndex + "; " + previousBlock.hash + "; " + nextTimestamp + "; " + blockData + "; " + nOnce++);
+        var nextHash = calculateHash(nextIndex, previousBlock.hash, nextTimestamp, blockData, nonce);
+        console.log('Hash for (' + nextIndex + "; " + previousBlock.hash + "; " + nextTimestamp + "; " + blockData + "; " + nonce++);
     } while (nextHash[0] != '0');
 
-    nOnce = nOnce - 1;
-    console.log('nOnce = ' + nOnce);
-    return new Block(nextIndex, previousBlock.hash, nextTimestamp, blockData, nextHash, nOnce);
+    nonce = nonce - 1;
+    console.log('nonce = ' + nonce);
+    return new Block(nextIndex, previousBlock.hash, nextTimestamp, blockData, nextHash, nonce);
 };
 
 
 var calculateHashForBlock = (block) => {
-    return calculateHash(block.index, block.previousHash, block.timestamp, block.data, block.nOnce);
+    return calculateHash(block.index, block.previousHash, block.timestamp, block.data, block.nonce);
 };
 
-var calculateHash = (index, previousHash, timestamp, data, nOnce) => {
-    console.log('Checking hash for (' + index + "; " + previousHash + "; " + timestamp + "; " + data + "; " + nOnce);
-    return CryptoJS.SHA256(index + previousHash + timestamp + data + nOnce).toString();
+var calculateHash = (index, previousHash, timestamp, data, nonce) => {
+    console.log('Checking hash for (' + index + "; " + previousHash + "; " + timestamp + "; " + data + "; " + nonce);
+    return CryptoJS.SHA256(index + previousHash + timestamp + data + nonce).toString();
 };
 
 var addBlock = (newBlock) => {
